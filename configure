@@ -1,0 +1,4 @@
+#! /bin/sh
+
+echo "Automake/autotools stuff were removed. Use cmake to configure the build."
+exit 1

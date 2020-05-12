@@ -1,0 +1,49 @@
+# ---------- macos ----------
+# Above line is mandatory!
+# rules to build tgz archive for Mac OS X
+
+message ( STATUS "Will create TGZ with build for Mac Os X" )
+set ( SPLIT_SYMBOLS 1 )
+
+# configure specific stuff
+set ( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch x86_64" )
+set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -arch x86_64" )
+
+# generate config files
+set ( CONFDIR "." )
+configure_file ( "manticore.conf.in" "${MANTICORE_BINARY_DIR}/manticore.conf" @ONLY )
+
+# install specific stuff
+install ( DIRECTORY api doc docs contrib DESTINATION . COMPONENT doc )
+
+install ( FILES COPYING INSTALL example.sql
+			"${MANTICORE_BINARY_DIR}/manticore.conf"
+		DESTINATION . COMPONENT doc )
+
+install ( DIRECTORY DESTINATION bin COMPONENT doc )
+install ( DIRECTORY DESTINATION data COMPONENT doc )
+install ( DIRECTORY DESTINATION log COMPONENT doc )
+install ( DIRECTORY misc/stopwords DESTINATION . COMPONENT doc )
+install ( FILES ${ICU_SRC}/source/data/in/icudt65l.dat DESTINATION icu COMPONENT doc)
+
+# package specific
+
+find_program ( SWVERSPROG sw_vers )
+if ( SWVERSPROG )
+	# use dpkg to fix the package file name
+	execute_process (
+			COMMAND ${SWVERSPROG} -productVersion
+			OUTPUT_VARIABLE MACOSVER
+			OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	mark_as_advanced ( SWVERSPROG MACOSVER )
+endif ( SWVERSPROG )
+
+if ( NOT MACOSVER )
+	set ( MACOSVER "10.12" )
+endif ()
+
+set ( CPACK_GENERATOR "TGZ" )
+LIST ( APPEND PKGSUFFIXES "osx${MACOSVER}" "x86_64" )
+
+mark_as_advanced ( CMAKE_OSX_ARCHITECTURES CMAKE_OSX_DEPLOYMENT_TARGET CMAKE_OSX_SYSROOT )

@@ -1,0 +1,1 @@
+%systemd_postun manticore.service
