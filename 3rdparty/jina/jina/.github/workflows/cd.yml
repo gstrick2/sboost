@@ -1,0 +1,97 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - master
+
+#on:
+#  push:
+#    branches-ignore:
+#      - '**'  # temporally ignore all
+
+
+jobs:
+  update-doc:
+    if: "!startsWith(github.event.head_commit.message, 'chore') && !startsWith(github.event.head_commit.message, 'build: hotfix')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: technote-space/toc-generator@v2
+        with:
+          MAX_HEADER_LEVEL: 2
+          FOLDING: false
+          GITHUB_TOKEN: ${{ secrets.JINA_DEV_BOT }}
+          COMMIT_NAME: Jina Dev Bot
+          COMMIT_EMAIL: dev-bot@jina.ai
+          TOC_TITLE: ''
+          TARGET_PATHS: 'README*.md,CHANGELOG.md,CONTRIBUTING.md'
+          COMMIT_MESSAGE: 'chore(docs): update TOC'
+      - uses: peter-evans/dockerhub-description@v2.1.0
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_DEVBOT_USER }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_DEVBOT_PWD }}
+          DOCKERHUB_REPOSITORY: jinaai/jina
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: jina-ai/api
+          path: schema
+          token: ${{ secrets.JINA_DEV_BOT }}
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+      - run: |
+          pip install .
+          jina check --summary-exec ./docs/chapters/all_exec.md --summary-driver ./docs/chapters/all_driver.md
+          echo ::set-env name=JINA_VERSION::"$(sed '6q;d' ./jina/__init__.py | cut -d \' -f2)-devel"
+      - run: |
+          cd schema
+          jina export-api --yaml-path "${{env.JINA_VERSION}}.yml" devel.yml --json-path "${{env.JINA_VERSION}}.json" devel.json devel
+          git config --local user.email "dev-bot@jina.ai"
+          git config --local user.name "Jina Dev Bot"
+          git add . && git commit -m "update ${{env.JINA_VERSION}} due to ${{github.event_name}} on ${{github.repository}}" && git push
+          cd ..
+          ./make-doc.sh commit "update ${{env.JINA_VERSION}} due to ${{github.event_name}} on ${{github.repository}}"
+      - uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.JINA_DEV_BOT }}
+          repository: jina-ai/jina-docs
+          directory: docs/_build/html
+          force: true
+
+  update-docker:
+    needs: update-doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: crazy-max/ghaction-docker-buildx@v1
+        with:
+          version: latest
+      - name: Set envs and versions
+        run: |
+          echo ${{ steps.buildx.outputs.platforms }}
+          echo ::set-env name=VCS_REF::$(git rev-parse --short HEAD)
+          echo ::set-env name=BUILD_DATE::$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo ::set-env name=INSTALL_DEV::"true"
+          echo ::set-env name=JINA_VERSION::"$(sed '6q;d' ./jina/__init__.py | cut -d \' -f2)-devel"
+      - name: Upload to Docker Registry
+        uses: elgohr/Publish-Docker-Github-Action@master
+        with:
+          name: jinaai/jina
+          username: ${{ secrets.DOCKERHUB_DEVBOT_USER }}
+          password: ${{ secrets.DOCKERHUB_DEVBOT_TOKEN }}
+          dockerfile: Dockerfiles/debianx.Dockerfile
+          buildargs: BUILD_DATE, VCS_REF, JINA_VERSION, INSTALL_DEV
+          tags: "devel, ${{env.JINA_VERSION}}"
+      - name: Upload to Github Docker Registry
+        uses: elgohr/Publish-Docker-Github-Action@master
+        with:
+          name: jina-ai/jina/jina
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: docker.pkg.github.com
+          dockerfile: Dockerfiles/debianx.Dockerfile
+          buildargs: BUILD_DATE, VCS_REF, JINA_VERSION, INSTALL_DEV
+          tags: "devel, ${{env.JINA_VERSION}}"
