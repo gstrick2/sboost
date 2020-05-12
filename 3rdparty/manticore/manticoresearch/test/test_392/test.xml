@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test>
+
+<name>document storage vs highlighting</name>
+
+<config>
+indexer
+{
+	mem_limit		= 16M
+}
+
+searchd
+{
+	<searchd_settings/>
+}
+
+source test1
+{
+	type			= mysql
+	<sql_settings/>
+	sql_query		= select id, title, body from test_table
+}
+
+index test1
+{
+	source			= test1
+	path			= <data_path/>/test1
+	stored_fields	= title, body
+}
+
+source test2
+{
+	type			= mysql
+	<sql_settings/>
+	sql_query		= select id, content from test_table2
+}
+
+index test2
+{
+	source			= test2
+	path			= <data_path/>/test2
+	stored_fields	= content
+	index_sp 		= 1
+	html_strip 		= 1
+}
+
+index test1_wild
+{
+	source			= test1
+	path			= <data_path/>/test1_wild
+	stored_fields	= title, body
+	min_prefix_len = 3
+}
+
+index test1_nostored
+{
+	source			= test1
+	path			= <data_path/>/test1_nostored
+}
+
+source test1s
+{
+	type			= mysql
+	<sql_settings/>
+	sql_query		= select id, title, body from test_table
+	sql_attr_string	= title
+}
+
+index test1s
+{
+	source			= test1s
+	path			= <data_path/>/test1s
+	stored_fields	= body
+}
+</config>
+
+<db_create>
+create table test_table
+(
+	id int not null,
+	title varchar(255) not null,
+	body varchar(255) not null
+);
+</db_create>
+
+<db_create>
+create table test_table2
+(                                             
+	id int not null,
+	content varchar(1024) not null
+);
+</db_create>
+
+<db_drop>drop table if exists test_table</db_drop>
+<db_drop>drop table if exists test_table2</db_drop>
+
+<db_insert>
+insert into test_table values
+( 1, 'document open 1', 'They followed Bander. The robots remained at a polite distance, but their presence was a constantly felt threat.' ),
+( 2, 'document all 2', 'A door opened before them, revealing a small room. Bander said, "Come, half-humans, I want to show you how we live."' ),
+( 3, 'document before 3', 'Trevize whispered, "It gets infantile pleasure out of display. I`d love to knock it down."' ),
+( 4, 'document three 4', 'Don`t try to compete in childishness, said Bliss.' ),
+( 5, 'document well 5', 'Bander ushered all three into the room. One of the robots followed as well. Bander gestured the other robots away and entered itself. The door closed behind it.' )
+</db_insert>
+
+<db_insert>
+<![CDATA[
+insert into test_table2 values
+( 1, '<p>The ideas of syntax highlighting overlap significantly with those of <a href="/wiki/Structure_editor" title="Structure editor">syntax-directed editors</a>. One of the first such editors for code was Wilfred Hansens 1969 code editor, Emily.<sup id="cite_ref-hansen_3-0" class="reference"><a href="#cite_note-hansen-3">[3]</a></sup><sup id="cite_ref-4" class="reference"><a href="#cite_note-4">[4]</a></sup> It provided advanced language-independent <a href="/wiki/Autocomplete" title="Autocomplete">code completion</a> facilities, and unlike modern editors with syntax highlighting, actually made it impossible to create syntactically incorrect programs.</p>' )
+]]>
+</db_insert>
+
+<sphqueries>
+<sphinxql>select snippet(body,'followed') from test1 where match('followed')</sphinxql>
+<sphinxql>select snippet(body,query()) from test1 where match('followed')</sphinxql>
+
+<sphinxql>select highlight() from test1 where match('followed')</sphinxql>
+<sphinxql>select highlight() from test1 where match('@title before')</sphinxql>
+<sphinxql>select highlight() from test1 where match('@body well')</sphinxql>
+<sphinxql>select highlight() from test1 where match('@body three')</sphinxql>
+<sphinxql>select highlight() from test1 where match('@(title,body) three')</sphinxql>
+
+<sphinxql>select highlight({},'title') from test1 where match('@(title,body) three')</sphinxql>
+<sphinxql>select highlight({},'body') from test1 where match('@(title,body) three')</sphinxql>
+<sphinxql>select highlight({},'') from test1 where match('@(title,body) three')</sphinxql>
+
+<sphinxql>select highlight({},'') from test1 where match('@(title,body) three')</sphinxql>
+<sphinxql>select highlight({before_match='&lt;S&gt;',after_match='&lt;/S&gt;'},'') from test1 where match('@(title,body) three')</sphinxql>
+<sphinxql>select highlight({before_match='&lt;S&gt;',after_match='&lt;/S&gt;'},'title') from test1 where match('@(title,body) three')</sphinxql>
+<sphinxql>select highlight({before_match='&lt;S&gt;',after_match='&lt;/S&gt;'},'title','document') from test1 where match('@(title,body) three')</sphinxql>
+<sphinxql>select highlight({before_match='&lt;S&gt;',after_match='&lt;/S&gt;'},'title',query()) from test1 where match('document')</sphinxql>
+
+<sphinxql>select highlight({},'-body') from test1 where match('three')</sphinxql>
+
+<sphinxql>select id, highlight({},'') from test1 where match('open followed')</sphinxql>
+
+<sphinxql>select title from test1 facet id;</sphinxql>
+
+<sphinxql>select highlight({limit=3}) from test1 where match('three')</sphinxql>
+
+<sphinxql>select content from test2 where match('code completion')</sphinxql>
+<sphinxql>select snippet(content,query(),'html_strip_mode=retain','limit=0') from test2 where match('code completion')</sphinxql>
+<sphinxql>select highlight({html_strip_mode=retain, limit=0}) from test2 where match('code completion')</sphinxql>
+<sphinxql>select snippet(content,query(),'html_strip_mode=strip') from test2 where match('ideas')</sphinxql>
+<sphinxql>select highlight({html_strip_mode=strip}) from test2 where match('ideas')</sphinxql>
+
+<sphinxql>select body,snippet(body,query(), 'before_match=%PASSAGE_ID%','after_match=/%PASSAGE_ID%') from test1 where match('three')</sphinxql>
+<sphinxql>select highlight({before_match='%PASSAGE_ID%',after_match='/%PASSAGE_ID%'}) from test1 where match('three')</sphinxql>
+
+<!-- regression for a crash on wrong syntax -->
+<sphinxql>select body,highlight({limit_words=10},body) AS h FROM test1 WHERE MATCH('three')</sphinxql>
+
+<sphinxql>select highlight() from test1_wild where match('followed')</sphinxql>
+<sphinxql>select highlight() from test1_nostored where match('followed')</sphinxql>
+
+<sphinxql>desc test1s</sphinxql>
+<sphinxql>select highlight({},'body') FROM test1s WHERE MATCH('three')</sphinxql>
+<sphinxql>select highlight({},body) FROM test1s WHERE MATCH('three')</sphinxql>
+<sphinxql>select highlight({},'title') FROM test1s WHERE MATCH('well')</sphinxql>
+<sphinxql>select highlight({},title) FROM test1s WHERE MATCH('well')</sphinxql>
+
+</sphqueries>
+
+</test>

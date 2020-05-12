@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test>
+
+<name>ALTER at index MVA</name>
+
+<config>
+indexer
+{
+	mem_limit				= 16M
+}
+
+searchd
+{
+	<searchd_settings/>
+	workers = threads
+
+}
+
+source src
+{
+  type      = mysql
+  <sql_settings/>
+  sql_query     = SELECT id, gid, title FROM test_table
+  sql_attr_uint   = gid
+}
+
+index test
+{
+  source      = src
+  path      = <data_path/>/test
+}
+
+index rt
+{
+	type = rt
+	path = <data_path/>/rt
+	rt_field = title
+	rt_attr_uint = attr1
+	rt_attr_uint = attr2
+	rt_attr_uint = attr3
+	rt_attr_multi = m1
+	rt_attr_multi = m2
+	rt_attr_multi = m3
+}
+
+index rt1
+{
+	type = rt
+	path = <data_path/>/rt1
+	rt_field = title
+	rt_attr_uint = attr1
+	rt_attr_uint = attr2
+    index_field_lengths = 1
+}
+
+
+</config>
+
+<db_create>
+CREATE TABLE `test_table` (
+  `id` int(11) NOT NULL,
+  `gid` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL
+);
+</db_create>
+<db_drop>DROP TABLE IF EXISTS `test_table`;</db_drop>
+<db_insert>INSERT INTO `test_table` VALUES (1,1,'test one')</db_insert>
+
+<sphqueries>
+<!-- regression crash on add \ remove plain attribute at index with blobs  -->
+<sphinxql>INSERT INTO rt VALUES (1, 'text', 11, 12, 13, (101, 102), (201, 202), (301, 302))</sphinxql>
+<sphinxql>select * from rt</sphinxql>
+<sphinxql>ALTER TABLE rt drop column attr3</sphinxql>
+<sphinxql>select * from rt</sphinxql>
+<sphinxql>ALTER TABLE rt drop column m3</sphinxql>
+<sphinxql>select * from rt</sphinxql>
+
+<!-- regression crash on add attribute to index with index_field_lengths (these should be always last for now)  -->
+<sphinxql>INSERT INTO rt1 (id, title, attr1) VALUES (101, 'text', 201)</sphinxql>
+<sphinxql>alter table rt1 add column m11 multi</sphinxql>
+<sphinxql>alter table rt1 add column m12 multi</sphinxql>
+<sphinxql>INSERT INTO rt1 (id, title, m11, m12) VALUES (102, 'text', (), ())</sphinxql>
+<sphinxql>alter table rt1 add column attr3 uint</sphinxql>
+<sphinxql>INSERT INTO rt1 (id, title, m11, attr3) VALUES (103, 'text', (203, 207, 204), 303)</sphinxql>
+</sphqueries>
+
+</test>

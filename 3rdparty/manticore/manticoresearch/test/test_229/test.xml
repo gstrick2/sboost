@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test>
+
+<name>query cache</name>
+
+<skip_indexer/>
+<config>
+indexer
+{
+	mem_limit		= 16M
+}
+
+searchd
+{
+	<searchd_settings/>
+}
+
+index rt
+{
+	type			= rt
+	path			= <data_path/>/rt
+	rt_field		= title
+	rt_attr_uint	= gid
+}
+</config>
+
+<sphqueries>
+<sphinxql>SET GLOBAL qcache_thresh_msec=0</sphinxql>
+<sphinxql>SET GLOBAL qcache_max_bytes=16777216</sphinxql>
+<sphinxql>TRUNCATE RTINDEX rt</sphinxql>
+<sphinxql>INSERT INTO rt (id,gid,title) VALUES (1,111,'test one')</sphinxql>
+<sphinxql>INSERT INTO rt (id,gid,title) VALUES (2,111,'test two')</sphinxql>
+<sphinxql>INSERT INTO rt (id,gid,title) VALUES (3,111,'test three')</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('test')</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('test')</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('test')</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_thresh%'</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_ttl%'</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_cached%'</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_hits%'</sphinxql>
+<sphinxql>TRUNCATE RTINDEX rt</sphinxql>
+<sphinxql>SET GLOBAL qcache_thresh_msec=1000</sphinxql>
+<sphinxql>INSERT INTO rt (id,gid,title) VALUES (1,222,'another generation')</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('test')</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('test')</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('another')</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('another')</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_thresh%'</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_ttl%'</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_cached%'</sphinxql>
+<sphinxql>SHOW STATUS LIKE 'qcache_hits%'</sphinxql>
+<sphinxql>SELECT *,WEIGHT() FROM rt WHERE MATCH('another') OPTION ranker=expr('-1')</sphinxql>
+
+<!-- regression negative value for set global -->
+<sphinxql>SET GLOBAL query_log_min_msec=-1</sphinxql>
+<sphinxql>SET GLOBAL query_log_min_msec=1</sphinxql>
+<sphinxql>SET GLOBAL query_log_min_msec=0</sphinxql>
+</sphqueries>
+
+</test>

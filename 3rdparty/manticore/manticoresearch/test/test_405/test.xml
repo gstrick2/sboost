@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test>
+
+<name>alter table settings</name>
+<skip_indexer/>
+
+<config>
+indexer
+{
+	mem_limit		= 16M
+}
+
+searchd
+{
+	<searchd_Settings/>
+	data_dir = <data_path path="data0"></data_path>
+}
+</config>
+
+<sphqueries>
+
+<sphinxql>create table test1 ( title text, tag integer )</sphinxql>
+<sphinxql>insert into test1 values (1, 'word form', 11)</sphinxql>
+<sphinxql>select * from test1 where match ( 'wordform' )</sphinxql>
+
+<sphinxql>alter table test1 wordforms = '<this_test/>/wordforms.txt'</sphinxql>
+
+<sphinxql>insert into test1 values (2, 'word form', 11)</sphinxql>
+<sphinxql>select * from test1 where match ( 'wordform' )</sphinxql>
+
+<!-- regression CREATE LIKE failed -->
+<sphinxql>CREATE TABLE test11 (title TEXT, category INT) min_infix_len='4'</sphinxql>
+<sphinxql>CREATE TABLE test12 LIKE test11</sphinxql>
+<sphinxql>ALTER TABLE test11 ignore_chars='.'</sphinxql>
+<sphinxql>SHOW INDEX test11 SETTINGS</sphinxql>
+<sphinxql>SHOW INDEX test12 SETTINGS</sphinxql>
+
+<sphinxql>drop table test1</sphinxql>
+<sphinxql>drop table test11</sphinxql>
+<sphinxql>drop table test12</sphinxql>
+
+
+</sphqueries>
+
+</test>

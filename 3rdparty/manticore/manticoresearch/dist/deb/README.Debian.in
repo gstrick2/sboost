@@ -1,0 +1,8 @@
+Manticore
+------------
+
+searchd will start automatically however the default configuration does not supply
+any indexes. Therefore, searchd will not continue running. You have to edit
+@SYSCONFDIR@/manticoresearch/manticore.conf to get any meaningful mode of operation.
+
+Documentation is available in @DOCDIRFULL@.
